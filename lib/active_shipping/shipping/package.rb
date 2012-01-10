@@ -5,6 +5,7 @@ module ActiveMerchant #:nodoc:
       
       cattr_accessor :default_options
       attr_reader :options, :value, :currency
+      attr_accessor :package_type
 
       # Package.new(100, [10, 20, 30], :units => :metric)
       # Package.new(Mass.new(100, :grams), [10, 20, 30].map {|m| Length.new(m, :centimetres)})
@@ -13,6 +14,7 @@ module ActiveMerchant #:nodoc:
         options = @@default_options.update(options) if @@default_options
         options.symbolize_keys!
         @options = options
+        @package_type = options[:package_type] || "Parcel" #endicia required
         
         @dimensions = [dimensions].flatten.reject {|d| d.nil?}
         

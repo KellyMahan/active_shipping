@@ -3,19 +3,25 @@ module ActiveMerchant #:nodoc:
     class Location
       ADDRESS_TYPES = %w{residential commercial po_box}
       
-      attr_reader :options,
+      attr_reader :name,
+                  :attention_name,
+                  :shipper_number,
+                  :tax_identification_number,
+                  :options,
                   :country,
                   :postal_code,
                   :province,
                   :city,
-                  :name,
                   :address1,
                   :address2,
                   :address3,
                   :phone,
                   :fax,
-                  :address_type,
+                  :email,
+                  :location_id,
                   :company_name
+                  
+      attr_accessor :address_type
       
       alias_method :zip, :postal_code
       alias_method :postal, :postal_code
@@ -25,6 +31,10 @@ module ActiveMerchant #:nodoc:
       alias_method :company, :company_name
       
       def initialize(options = {})
+        @name = options[:name]
+        @attention_name = options[:attention_name]
+        @shipper_number = options[:shipper_number]
+        @tax_identification_number = options[:tax_identification_number]
         @country = (options[:country].nil? or options[:country].is_a?(ActiveMerchant::Country)) ?
                       options[:country] :
                       ActiveMerchant::Country.find(options[:country])
@@ -37,17 +47,19 @@ module ActiveMerchant #:nodoc:
         @address3 = options[:address3]
         @phone = options[:phone]
         @fax = options[:fax]
+        raise ArgumentError.new("address_type must be one of #{ADDRESS_TYPES.join(', ')}") unless ADDRESS_TYPES.include?(value.to_s)
+        @address_type = options[:address_type].nil? ? nil : options[:address_type].to_s
+        
         @company_name = options[:company_name] || options[:company]
-
         self.address_type = options[:address_type]
       end
       
       def self.from(object, options={})
         return object if object.is_a? ActiveMerchant::Shipping::Location
         attr_mappings = {
-          :name => [:name],
+          :name => [[:first_name, :last_name], :name, :company],
           :country => [:country_code, :country],
-          :postal_code => [:postal_code, :zip, :postal],
+          :postal_code => [:postal_code, :zip, :postal, :zipcode],
           :province => [:province_code, :state_code, :territory_code, :region_code, :province, :state, :territory, :region],
           :city => [:city, :town],
           :address1 => [:address1, :address, :street],
@@ -56,6 +68,11 @@ module ActiveMerchant #:nodoc:
           :phone => [:phone, :phone_number],
           :fax => [:fax, :fax_number],
           :address_type => [:address_type],
+          :email => [:email],
+          :location_id => [:location_id],
+          :shipper_number => [:shipper_number],
+          :attention_name => [:attention_name],
+          :tax_identification_number => [:tax_identification_number, :tax_id],
           :company_name => [:company, :company_name]
         }
         attributes = {}
@@ -67,14 +84,33 @@ module ActiveMerchant #:nodoc:
         end
         attr_mappings.each do |pair|
           pair[1].each do |sym|
-            if value = (object[sym] if hash_access) || (object.send(sym) if object.respond_to?(sym) && (!hash_access || !Hash.public_instance_methods.include?(sym.to_s)))
-              attributes[pair[0]] = value
-              break
+            if sym.is_a?(Array)
+              new_val = begin
+                if hash_access
+                  sym.map{|s| object[s]}.join(" ") 
+                else
+                  sym.map{|s| object.send(s)}.join(" ") 
+                end
+              rescue 
+                nil
+              end
+              attributes[pair[0]] = new_val
+              break if new_val
+            else
+              if value = (object[sym] if hash_access) || (object.send(sym) if object.respond_to?(sym) && (!hash_access || !Hash.public_instance_methods.include?(sym.to_s)))
+                attributes[pair[0]] = value
+                break
+              end
             end
           end
         end
         attributes.delete(:address_type) unless ADDRESS_TYPES.include?(attributes[:address_type].to_s)
-        self.new(attributes.update(options))
+        new_location = self.new(attributes.update(options))
+        unless new_location.company._?.empty?
+          new_location.attention_name = new_location.name unless new_location.name._?.empty?
+          new_location.name = new_location.company
+        end
+        return new_location
       end
       
       def country_code(format = :alpha2)
