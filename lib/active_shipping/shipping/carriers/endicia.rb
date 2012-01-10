@@ -274,7 +274,7 @@ module ActiveMerchant
             root_node << XmlNode.new('PartnerTransactionID', shipment.reference_number)
             
             
-            if shipment.shipper.attention_name._?.empty?
+            if (shipment.shipper.attention_name ? shipment.shipper.attention_name.empty? : nil)
               root_node << XmlNode.new('FromName', shipment.shipper.name)
               root_node << XmlNode.new('FromCompany')
             else
@@ -288,7 +288,7 @@ module ActiveMerchant
             root_node << XmlNode.new('FromPostalCode', shipment.shipper.postal_code)
             root_node << XmlNode.new('FromPhone', shipment.shipper.phone.gsub(/[^0-9]/,""))
           
-            if shipment.ship_to.attention_name._?.empty?
+            if (shipment.shipper.attention_name ? shipment.shipper.attention_name.empty? : nil)
               root_node << XmlNode.new('ToName', shipment.ship_to.name)
               root_node << XmlNode.new('ToCompany')
             else

@@ -106,8 +106,8 @@ module ActiveMerchant #:nodoc:
         end
         attributes.delete(:address_type) unless ADDRESS_TYPES.include?(attributes[:address_type].to_s)
         new_location = self.new(attributes.update(options))
-        unless new_location.company._?.empty?
-          new_location.attention_name = new_location.name unless new_location.name._?.empty?
+        unless (new_location.company ? new_location.company.empty? : nil)
+          new_location.attention_name = new_location.name unless (new_location.company ? new_location.company.empty? : nil)
           new_location.name = new_location.company
         end
         return new_location

@@ -9,16 +9,10 @@ module ActiveMerchant #:nodoc:
       class RequiredOptionError < StandardError; end
       class SaveLabelError < StandardError; end
       class VerifyRatesError < StandardError; end
-      #required attributes
+      class IncompleteLabelCoverageError < StandardError; end
+      
       attr_accessor :ship_to, :shipper, :carrier, :options, :rate_xml, :label_xml, :tracking, :postage, :error
-      #attr_accessor :service_type_code #available options in ActiveShipping::Shipping::Ups::DEFAULT_SERVICES
       
-      
-      
-      # optional attributes
-      #attr_accessor :ship_from #required if pickup location is different from shipper
-      #attr_accessor :description #only required for international shipments
-      #attr_accessor :return_service_code
       PAYMENT_TYPES = [:credit_card, :bill_to_account]
       REQUIRED_SHIPMENT_OPTIONS = [:service_type_code, :payment_type, :packages, :reference_number, :print_method_code]
       SHIPMENT_OPTIONS = [
@@ -42,12 +36,6 @@ module ActiveMerchant #:nodoc:
           :residential
         ]
         
-      # UPS_DEFAULT_OPTIONS= {
-      #   :service_type_code => "03", 
-      #   :payment_type=> :bill_to_account, 
-      #   :description=>"",
-      #   :print_method_code => "ZPL"
-      # }
       
       
       def initialize(shipper, ship_to, carrier, options={})
@@ -64,6 +52,7 @@ module ActiveMerchant #:nodoc:
       end
       
       def check_for_customs
+        #this needs more work, was originally intended to check for only US armed forces locations.
          (self.ship_to.province == "AE" || self.ship_to.province == "AP" || self.ship_to.province == "AA")
       end
       
@@ -74,8 +63,9 @@ module ActiveMerchant #:nodoc:
       def request_label(shipmentdigest = nil)
         case @carrier
         when ActiveMerchant::Shipping::USPS
-          @label_xml = @carrier.find_shipping_label_certify(self, @options)
-          return @label_xml
+          raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
+          # @label_xml = @carrier.find_shipping_label_certify(self, @options)
+          # return @label_xml
         when ActiveMerchant::Shipping::Endicia
           @label_xml = @carrier.create_shipping_label(self, @options)
           doc = Hpricot(@label_xml)
@@ -84,19 +74,21 @@ module ActiveMerchant #:nodoc:
           @error = "#{(doc/"errormessage")._?.inner_text.gsub(/"|\n|\r/,'')}" unless (doc/"errormessage")._?.inner_text.empty?
           return @label_xml
         when ActiveMerchant::Shipping::FedEx
-          @label_xml = @carrier.create_shipping_label(self, @options)
-          doc = Hpricot(@label_xml)
-          @tracking = (doc/'tracking/trackingnumber')._?.inner_text
-          @postage = (doc/'estimatedcharges/discountedcharges/shipmentnetcharge')._?.inner_text.to_f
-          @error = "#{(doc/"error/message")._?.inner_text.gsub(/"|\n|\r/,'')}" unless (doc/"error/message")._?.inner_text.empty?
-          return @label_xml
+          raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
+          # @label_xml = @carrier.create_shipping_label(self, @options)
+          # doc = Hpricot(@label_xml)
+          # @tracking = (doc/'tracking/trackingnumber')._?.inner_text
+          # @postage = (doc/'estimatedcharges/discountedcharges/shipmentnetcharge')._?.inner_text.to_f
+          # @error = "#{(doc/"error/message")._?.inner_text.gsub(/"|\n|\r/,'')}" unless (doc/"error/message")._?.inner_text.empty?
+          # return @label_xml
         else
-          @label_xml, success, message = @carrier.find_shipping_accept(shipment_digest, @options)
-          if success
-            return @label_xml
-          else
-            return "<error>#{message}</error>"
-          end
+          raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
+          # @label_xml, success, message = @carrier.find_shipping_accept(shipment_digest, @options)
+          # if success
+          #   return @label_xml
+          # else
+          #   return "<error>#{message}</error>"
+          # end
         end
       end
       
