@@ -3,9 +3,7 @@ module ActiveMerchant #:nodoc:
     class Location
       ADDRESS_TYPES = %w{residential commercial po_box}
       
-      attr_reader :name,
-                  :attention_name,
-                  :shipper_number,
+      attr_reader :shipper_number,
                   :tax_identification_number,
                   :options,
                   :country,
@@ -18,10 +16,12 @@ module ActiveMerchant #:nodoc:
                   :phone,
                   :fax,
                   :email,
-                  :location_id,
-                  :company_name
+                  :location_id
                   
-      attr_accessor :address_type
+      attr_accessor :address_type,
+                    :company_name,
+                    :name,
+                    :attention_name
       
       alias_method :zip, :postal_code
       alias_method :postal, :postal_code
@@ -47,7 +47,7 @@ module ActiveMerchant #:nodoc:
         @address3 = options[:address3]
         @phone = options[:phone]
         @fax = options[:fax]
-        raise ArgumentError.new("address_type must be one of #{ADDRESS_TYPES.join(', ')}") unless ADDRESS_TYPES.include?(value.to_s)
+        raise ArgumentError.new("address_type must be one of #{ADDRESS_TYPES.join(', ')}") unless ADDRESS_TYPES.include?(options[:address_type].to_s)
         @address_type = options[:address_type].nil? ? nil : options[:address_type].to_s
         
         @company_name = options[:company_name] || options[:company]
@@ -87,10 +87,12 @@ module ActiveMerchant #:nodoc:
             if sym.is_a?(Array)
               new_val = begin
                 if hash_access
-                  sym.map{|s| object[s]}.join(" ") 
+                  _new_val = sym.map{|s| object[s]}.join(" ") 
                 else
-                  sym.map{|s| object.send(s)}.join(" ") 
+                  _new_val = sym.map{|s| object.send(s)}.join(" ") 
                 end
+                _new_val = nil if _new_val.strip.empty?
+                _new_val
               rescue 
                 nil
               end
@@ -106,9 +108,9 @@ module ActiveMerchant #:nodoc:
         end
         attributes.delete(:address_type) unless ADDRESS_TYPES.include?(attributes[:address_type].to_s)
         new_location = self.new(attributes.update(options))
-        unless (new_location.company ? new_location.company.empty? : nil)
-          new_location.attention_name = new_location.name unless (new_location.company ? new_location.company.empty? : nil)
-          new_location.name = new_location.company
+        unless (new_location.company_name ? new_location.company_name.empty? : nil)
+          new_location.attention_name = new_location.name unless (new_location.company_name ? new_location.company_name.empty? : nil)
+          new_location.name = new_location.company_name
         end
         return new_location
       end

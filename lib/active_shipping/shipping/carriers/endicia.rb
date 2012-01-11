@@ -10,11 +10,11 @@ module ActiveMerchant
       @@name = "Endicia"
       CONFIG_NAME="endicia"
             
-      TEST_URL = 'https://www.envmgr.com/LabelService/EwsLabelService.asmx'
-      LIVE_URL = 'https://LabelServer.endicia.com/LabelService/EwsLabelService.asmx'
+      LIVE_URL = TEST_URL = 'https://www.envmgr.com/LabelService/EwsLabelService.asmx'
+      #LIVE_URL = 'https://LabelServer.endicia.com/LabelService/EwsLabelService.asmx'
       
-      TEST_URL_REFUND = 'https://www.endicia.com/ELS/ELSServices.cfc?wsdl'
-      LIVE_URL_REFUND = 'https://www.endicia.com/ELS/ELSServices.cfc?wsdl'
+      LIVE_URL_REFUND = TEST_URL_REFUND = 'https://www.endicia.com/ELS/ELSServices.cfc?wsdl'
+      #LIVE_URL_REFUND = 'https://www.endicia.com/ELS/ELSServices.cfc?wsdl'
       
       
       RESOURCES = {
@@ -264,7 +264,7 @@ module ActiveMerchant
       def build_shipping_label_request(shipment, options={})
         
         # label_requests = shipment.packages.map do |package|
-          package = shipment.packages[0]
+          package = shipment.package
           #xml_request = XmlNode.new('LabelRequest', :Test=> "YES", :LabelType => "Default", :LabelSize=>"4X6", :ImageFormat=>"ZPLII") do |root_node|
           xml_request = XmlNode.new('LabelRequest', :LabelType => "Default", :LabelSize=>"4X6", :ImageFormat=>@options[:print_method_code]) do |root_node|
             root_node << XmlNode.new('RequesterID', @options[:requester_id])
@@ -276,7 +276,7 @@ module ActiveMerchant
             
             if (shipment.shipper.attention_name ? shipment.shipper.attention_name.empty? : nil)
               root_node << XmlNode.new('FromName', shipment.shipper.name)
-              root_node << XmlNode.new('FromCompany')
+              root_node << XmlNode.new('FromCompany', '')
             else
               root_node << XmlNode.new('FromName', shipment.shipper.attention_name)
               root_node << XmlNode.new('FromCompany', shipment.shipper.name)
@@ -286,7 +286,7 @@ module ActiveMerchant
             root_node << XmlNode.new('FromCity', shipment.shipper.city)
             root_node << XmlNode.new('FromState', shipment.shipper.province)
             root_node << XmlNode.new('FromPostalCode', shipment.shipper.postal_code)
-            root_node << XmlNode.new('FromPhone', shipment.shipper.phone.gsub(/[^0-9]/,""))
+            root_node << XmlNode.new('FromPhone', (shipment.shipper.phone.gsub(/[^0-9]/,"") rescue nil))
           
             if (shipment.shipper.attention_name ? shipment.shipper.attention_name.empty? : nil)
               root_node << XmlNode.new('ToName', shipment.ship_to.name)

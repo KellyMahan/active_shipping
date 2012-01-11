@@ -2,10 +2,9 @@ module ActiveMerchant #:nodoc:
   module Shipping
     
     #TODO This really needs some work before integrating into active shipping.
-    
+    require "base64"
     
     class Shipment
-      require 'nokogiri'
       class RequiredOptionError < StandardError; end
       class SaveLabelError < StandardError; end
       class VerifyRatesError < StandardError; end
@@ -14,7 +13,7 @@ module ActiveMerchant #:nodoc:
       attr_accessor :ship_to, :shipper, :carrier, :options, :rate_xml, :label_xml, :tracking, :postage, :error
       
       PAYMENT_TYPES = [:credit_card, :bill_to_account]
-      REQUIRED_SHIPMENT_OPTIONS = [:service_type_code, :payment_type, :packages, :reference_number, :print_method_code]
+      REQUIRED_SHIPMENT_OPTIONS = [:service_type_code, :payment_type, :package, :reference_number, :print_method_code]
       SHIPMENT_OPTIONS = [
           :ship_from, 
           :description, 
@@ -68,10 +67,12 @@ module ActiveMerchant #:nodoc:
           # return @label_xml
         when ActiveMerchant::Shipping::Endicia
           @label_xml = @carrier.create_shipping_label(self, @options)
-          doc = Hpricot(@label_xml)
-          @tracking = (doc/'trackingnumber')._?.inner_text
-          @postage = (doc/'finalpostage')._?.inner_text.to_f
-          @error = "#{(doc/"errormessage")._?.inner_text.gsub(/"|\n|\r/,'')}" unless (doc/"errormessage")._?.inner_text.empty?
+          
+          xml = REXML::Document.new(@label_xml).root
+          @tracking = xml.get_text('TrackingNumber').to_s
+          @postage = xml.get_text('FinalPostage').to_s.to_f
+          @error = xml.get_text('ErrorMessage').to_s.gsub(/"|\n|\r/,'')
+          
           return @label_xml
         when ActiveMerchant::Shipping::FedEx
           raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
@@ -103,13 +104,14 @@ module ActiveMerchant #:nodoc:
       end
       
       
-      def error_data
-        doc = Hpricot(@label_xml)
+      def error_data        
+        xml = REXML::Document.new(@label_xml).root
         case @carrier
         when ActiveMerchant::Shipping::FedEx
+          response = xml.get_text('error/message').to_s.gsub(/(\n|\t|\s)/,"") rescue nil
           response = (doc/'error'/'message').inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
         when ActiveMerchant::Shipping::Endicia
-          response = (doc/"errormessage").inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
+          response = xml.get_text('ErrorMessage').to_s.gsub(/(\n|\t|\s)/,"") rescue nil
         else
           raise SaveLabelError, "Error data for #{@carrier} not supported."
         end
@@ -121,16 +123,16 @@ module ActiveMerchant #:nodoc:
       end
       
       def label_data
-        doc = Hpricot(@label_xml)
+        xml = REXML::Document.new(@label_xml).root
         case @carrier
         when ActiveMerchant::Shipping::USPS
-          return (doc/"deliveryconfirmationlabel").inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
+          return xml.get_text('*deliveryconfirmationlabel').to_s.gsub(/(\n|\t|\s)/,"") rescue nil
         when ActiveMerchant::Shipping::FedEx
-          return (doc/"labels/outboundlabel").inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
+          return xml.get_text('*labels/outboundlabel').to_s.gsub(/(\n|\t|\s)/,"") rescue nil
         when ActiveMerchant::Shipping::Endicia
-          return (doc/"base64labelimage").inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
-        when ActiveMerchant::Shipping::UPS
-          return (doc/"graphicimage").inner_text.gsub(/(\n|\t|\s)/,"") rescue nil
+          return xml.get_text('Base64LabelImage').to_s.gsub(/(\n|\t|\s)/,'') rescue nil
+        when ActiveMerchant::Shipping::UPS  
+          return xml.get_text('*graphicimage').to_s.gsub(/(\n|\t|\s)/,'') rescue nil
         else
           raise SaveLabelError, "Label data for #{@carrier} not supported."
         end
@@ -138,11 +140,11 @@ module ActiveMerchant #:nodoc:
       
       def customs_data
         tempdata = nil
-        doc = Hpricot(@label_xml)
+        xml = REXML::Document.new(@label_xml).root
         case @carrier
         when ActiveMerchant::Shipping::Endicia
           if self.check_for_customs
-            tempdata = (doc/"customsform"/"image").first.inner_text.gsub(/(\n|\t|\s)/,"")
+            tempdata = xml.get_text('CustomesForm/Image').to_s.gsub(/(\n|\t|\s)/,"")
           end
         else
           #raise SaveLabelError, "Customs data for #{@carrier} not supported."
@@ -170,10 +172,11 @@ module ActiveMerchant #:nodoc:
               
       def shipment_digest
         if @rate_xml
-          doc = Hpricot(@rate_xml)
+          
+          xml = REXML::Document.new(@rate_xml).root
           return case @carrier
           when ActiveMerchant::Shipping::UPS
-            (doc/"shipmentdigest").inner_text
+            xml.get_text('ShipmentDigest').to_s
           else
             raise SaveLabelError, "Requesting label for #{@carrier} not supported."
           end
