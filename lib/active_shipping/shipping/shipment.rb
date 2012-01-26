@@ -13,7 +13,7 @@ module ActiveMerchant #:nodoc:
       attr_accessor :ship_to, :shipper, :carrier, :options, :rate_xml, :label_xml, :tracking, :postage, :error
       
       PAYMENT_TYPES = [:credit_card, :bill_to_account]
-      REQUIRED_SHIPMENT_OPTIONS = [:service_type_code, :payment_type, :package, :reference_number, :print_method_code]
+      REQUIRED_SHIPMENT_OPTIONS = [:service_type_code, :payment_type, :packages, :reference_number, :print_method_code]
       SHIPMENT_OPTIONS = [
           :ship_from, 
           :description, 
@@ -35,15 +35,28 @@ module ActiveMerchant #:nodoc:
           :residential
         ]
         
+        
+
       
-      
+      def destination
+        @ship_to
+      end
+
+      def origin
+        @ship_from
+      end
+
       def initialize(shipper, ship_to, carrier, options={})
         @options = options
         @carrier = carrier.new(options)
         @shipper = Location.from(shipper)
         @ship_to = Location.from(ship_to)
         set_options(options)
-        @ship_from = Location.from(@ship_from) if @ship_from
+        if @ship_from
+          @ship_from = Location.from(@ship_from)
+        else
+          @ship_from = @shipper
+        end
       end
       
       def test=(value)
@@ -75,7 +88,17 @@ module ActiveMerchant #:nodoc:
           
           return @label_xml
         when ActiveMerchant::Shipping::FedEx
-          raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
+          
+          @label_xml = @carrier.create_shipping_label(self, @options)
+          
+          xml = REXML::Document.new(@label_xml).root
+          @tracking = xml.get_text('TrackingNumber').to_s
+          @postage = xml.get_text('ShipmentCharge').to_s.to_f
+          @error = xml.get_text('Error/Message').to_s.gsub(/"|\n|\r/,'')
+          
+          return @label_xml
+          
+          #raise IncompleteLabelCoverageError, "Label functionality is not yet supported for #{@carrier.name}"
           # @label_xml = @carrier.create_shipping_label(self, @options)
           # doc = Hpricot(@label_xml)
           # @tracking = (doc/'tracking/trackingnumber')._?.inner_text

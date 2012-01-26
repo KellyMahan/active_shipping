@@ -125,7 +125,7 @@ module ActiveMerchant #:nodoc:
 
       def address_type=(value)
         return unless value.present?
-        raise ArgumentError.new("address_type must be one of #{ADDRESS_TYPES.join(', ')}") unless ADDRESS_TYPES.include?(value.to_s)
+        raise ArgumentError.new("address_type must be one of #{ADDRESS_TYPES.join(', ')}") unless ADDRESS_TYPES.include?(value.downcase.to_s)
         @address_type = value.to_s
       end
 
